@@ -76,10 +76,7 @@
             <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>
         );
 
-        // --- データ定義 (名称更新・順序固定) ---
-        // name: 正解画面などで表示される正式名称（エンペラーペンギンなど）
-        // shortName: 選択肢ボタンに表示される略称（エンペラーなど）
-        
+        // --- データ定義 ---
         const PENGUIN_DATA = [
             { 
                 id: 'emperor', name: 'エンペラーペンギン', shortName: 'エンペラー', count: 4, 
@@ -182,7 +179,7 @@
                 for (let i = 1; i <= species.count; i++) {
                     images.push({
                         ...species,
-                        fileName: `${species.id}_${i}.jpg`, // n_rockhopper_1.jpg 等が生成されます
+                        fileName: `${species.id}_${i}.JPG`, // 基本は.JPGを生成
                         imageKey: `${species.id}_${i}`,
                     });
                 }
@@ -197,6 +194,45 @@
                 [newArray[i], newArray[j]] = [newArray[j], newArray[i]];
             }
             return newArray;
+        };
+
+        // --- 画像エラーハンドリング関数 ---
+        const handleImageError = (e, altText) => {
+            // .JPGでエラーが出たら、.jpg (小文字) を試す
+            if (e.target.src.includes('.JPG')) {
+                const newSrc = e.target.src.replace('.JPG', '.jpg');
+                // 無限ループ防止のため、リトライ用のハンドラを上書き
+                e.target.onerror = (e2) => {
+                    // .jpgでもダメならプレースホルダー
+                    e2.target.src = `https://placehold.co/600x800/111/333?text=${altText || 'No Image'}`;
+                    // 背景用など非表示にしたい場合は別途制御が必要だが、今回はクイズ用メイン画像を優先
+                };
+                e.target.src = newSrc;
+            } else if (e.target.src.includes('.PNG')) {
+                // .PNGでエラーなら .png
+                 const newSrc = e.target.src.replace('.PNG', '.png');
+                 e.target.onerror = (e2) => {
+                    e2.target.src = `https://placehold.co/150x150/transparent/white?text=No+Img`;
+                 };
+                 e.target.src = newSrc;
+            } else {
+                // それ以外はプレースホルダー
+                e.target.src = `https://placehold.co/600x800/111/333?text=${altText || 'No Image'}`;
+            }
+        };
+
+        // 背景画像用のエラーハンドリング（失敗したら非表示）
+        const handleBgImageError = (e) => {
+            if (e.target.src.includes('.JPG')) {
+                e.target.src = e.target.src.replace('.JPG', '.jpg');
+                e.target.onerror = (e2) => {
+                    e2.target.style.display = 'none';
+                    e2.target.parentElement.style.backgroundColor = '#334155';
+                };
+            } else {
+                e.target.style.display = 'none';
+                e.target.parentElement.style.backgroundColor = '#334155';
+            }
         };
 
         // --- メインアプリ ---
@@ -219,15 +255,13 @@
             }, [gameState]);
 
             const startGame = () => {
-                // シャッフルして10問選出
                 const shuffledImages = shuffleArray(allImages);
                 const selectedImages = shuffledImages.slice(0, 10);
 
                 const questions = selectedImages.map((correctImage) => {
-                    // 選択肢は固定順序（PENGUIN_DATAの並びそのまま）
                     return {
                         image: correctImage,
-                        choices: PENGUIN_DATA, // ここでシャッフルせず固定リストを渡す
+                        choices: PENGUIN_DATA,
                     };
                 });
 
@@ -257,7 +291,7 @@
                     questionImage: currentQuestion.image,
                     isCorrect: isCorrect,
                     userAnswerName: choice.shortName,
-                    correctAnswerName: currentQuestion.image.name // 修正: 正解の名前をfull nameにする
+                    correctAnswerName: currentQuestion.image.name
                 }]);
             };
 
@@ -272,8 +306,7 @@
                 }
             };
 
-            // 画像のパス取得
-            const getIllustPath = (index) => `illust_${index}.png`;
+            const getIllustPath = (index) => `illust_${index}.PNG`; // 大文字.PNG
 
             // --- 画面: タイトル ---
             if (gameState === 'title') {
@@ -288,16 +321,13 @@
                                         src={img.fileName} 
                                         alt=""
                                         className="w-full h-full object-cover"
-                                        onError={(e) => {
-                                            e.target.style.display = 'none';
-                                            e.target.parentElement.style.backgroundColor = '#334155';
-                                        }}
+                                        onError={handleBgImageError} // リトライ機能付き
                                     />
                                 </div>
                             ))}
                         </div>
 
-                        {/* メインエリア：黒いボックスを削除 */}
+                        {/* メインエリア */}
                         <div className="z-10 flex flex-col items-center p-8 mx-4 text-center max-w-sm w-full">
                             <div className="mb-4 relative">
                                 <img 
@@ -305,7 +335,7 @@
                                     alt="Penguin"
                                     className="h-32 md:h-40 object-contain drop-shadow-2xl animate-float"
                                     style={{ filter: "drop-shadow(0 0 10px rgba(0,0,0,0.5))" }}
-                                    onError={(e) => { e.target.src = "https://placehold.co/150x150/transparent/white?text=Penguin"; }}
+                                    onError={(e) => handleImageError(e, 'Penguin')}
                                 />
                             </div>
                             
@@ -326,7 +356,7 @@
                         </div>
                         
                         <div className="absolute bottom-4 text-white/90 text-xs z-10 font-mono drop-shadow-md">
-                            Total Photos: 56 | Ver 4.0
+                            Total Photos: 56 | Ver 5.0-AutoFix
                         </div>
                     </div>
                 );
@@ -353,7 +383,7 @@
                                 src={currentQuestion.image.fileName} 
                                 alt="Question"
                                 className="max-w-full max-h-full object-contain drop-shadow-2xl"
-                                onError={(e) => { e.target.src = `https://placehold.co/600x800/111/333?text=${currentQuestion.image.shortName}`; }}
+                                onError={(e) => handleImageError(e, currentQuestion.image.shortName)} // リトライ機能付き
                             />
                         </div>
 
@@ -463,7 +493,7 @@
                                             animationDelay: `${i * 0.3}s`,
                                             width: `${80 + Math.random() * 100}px`
                                         }}
-                                        onError={(e) => { e.target.style.display = 'none'; }}
+                                        onError={(e) => handleImageError(e, 'parade')}
                                     />
                                 ))}
                             </div>
@@ -501,7 +531,7 @@
                                                     src={res.questionImage.fileName} 
                                                     alt="thumb" 
                                                     className="w-full h-full object-contain bg-black" 
-                                                    onError={(e) => { e.target.src = "https://placehold.co/100x100?text=?"; }}
+                                                    onError={(e) => handleImageError(e, 'thumb')}
                                                 />
                                             </div>
                                             <div className="flex-1 min-w-0">
